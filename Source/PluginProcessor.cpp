@@ -27,7 +27,8 @@ TSM1N3AudioProcessor::TSM1N3AudioProcessor()
     treeState(*this, nullptr, "PARAMETER", { std::make_unique<AudioParameterFloat>(GAIN_ID, GAIN_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f),
                         std::make_unique<AudioParameterFloat>(TONE_ID, TONE_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f),
                         std::make_unique<AudioParameterFloat>(MASTER_ID, MASTER_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5),
-                        std::make_unique<AudioParameterChoice>(INPUT_GAIN_ID, INPUT_GAIN_NAME, StringArray { "LO", "MID", "HI" }, 1) })
+                        std::make_unique<AudioParameterChoice>(INPUT_GAIN_ID, INPUT_GAIN_NAME, StringArray { "LO", "MID", "HI" }, 1),
+                        std::make_unique<AudioParameterBool>(PUSH_ID, PUSH_NAME, false) })
 
 #endif
 {
@@ -35,6 +36,7 @@ TSM1N3AudioProcessor::TSM1N3AudioProcessor()
     masterParam = treeState.getRawParameterValue (MASTER_ID);
     toneParam = treeState.getRawParameterValue (TONE_ID);
     inputGainParam = treeState.getRawParameterValue (INPUT_GAIN_ID);
+    pushParam = treeState.getRawParameterValue (PUSH_ID);
 }
 
 
@@ -128,6 +130,19 @@ void TSM1N3AudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     // Report total resampler latency to the host DAW so it can align tracks
     setLatencySamples (resampler.getLatencySamples());
 
+    // Prepare Push Mod filters (processed per channel, so 1 channel spec)
+    dsp::ProcessSpec spec;
+    spec.sampleRate = safeSampleRate;
+    spec.maximumBlockSize = (uint32) safeBlockSize;
+    spec.numChannels = 1;
+
+    pushFilterL.prepare (spec);
+    pushFilterR.prepare (spec);
+
+    // Force update of filter coefficients on first process block
+    previousPushValue = -1.0f;
+    updatePushFilters (safeSampleRate);
+
     // load 48 kHz sample rate model from MessagePack binary format using custom allocator
     AllocationTracker::reset();
 
@@ -206,6 +221,29 @@ void TSM1N3AudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&
         }
         buffer.applyGain (inputGainFactor);
 		
+        // --- PUSH MOD EQ PROCESS (PRE-OVERDRIVE) ---
+        if (pushParam != nullptr)
+        {
+            auto pushValue = pushParam->load();
+            if (pushValue != previousPushValue)
+            {
+                previousPushValue = pushValue;
+                updatePushFilters (getSampleRate());
+            }
+
+            auto numSamples = buffer.getNumSamples();
+            auto* channelDataL = buffer.getWritePointer (0);
+            for (int i = 0; i < numSamples; ++i)
+                channelDataL[i] = pushFilterL.processSample (channelDataL[i]);
+
+            if (buffer.getNumChannels() > 1)
+            {
+                auto* channelDataR = buffer.getWritePointer (1);
+                for (int i = 0; i < numSamples; ++i)
+                    channelDataR[i] = pushFilterR.processSample (channelDataR[i]);
+            }
+        }
+
         // resample to target sample rate
         dsp::AudioBlock<float> block(buffer);
         //auto block = dsp::AudioBlock<float>(buffer.getArrayOfWritePointers(), 1, numSamples);
@@ -280,6 +318,18 @@ void TSM1N3AudioProcessor::setStateInformation (const void* data, int sizeInByte
                 editor->resetImages();
         }
     }
+}
+
+
+void TSM1N3AudioProcessor::updatePushFilters (double sampleRate)
+{
+    float gainDb = (pushParam != nullptr && pushParam->load() > 0.5f) ? 2.0f : 0.0f;
+    float gainFactor = Decibels::decibelsToGain (gainDb);
+    
+    auto coeffs = dsp::IIR::Coefficients<float>::makePeakFilter (sampleRate, 200.0f, 1.0f, gainFactor);
+    
+    pushFilterL.coefficients = coeffs;
+    pushFilterR.coefficients = coeffs;
 }
 
 

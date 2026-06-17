@@ -85,6 +85,7 @@ This fork of **TS-M1N3** serves as an experimental branch exploring alternative 
 * **CMake Dependency Order Resolution**: Fixed parallel compilation race conditions by linking `BinaryData` directly to the `TS-M1N3` target.
 
 ### 2. Real-Time Performance & DSP Optimizations
+* **Pre-Overdrive EQ Peaking (Push Mod)**: Configured a stereo `juce::dsp::IIR::Filter<float>` parametric peaking EQ centered at `200 Hz` with `+2.0 dB` boost and a Q of `1.0` pre-overdrive, enriching the "fatness" of the guitar tone by shaping the clipping density.
 * **Pre-compiled Binary Weights (MessagePack)**: Converted the neural network weights from JSON text (`.json`, ~106 KB) to binary MessagePack (`.msgpack`, ~24.5 KB), achieving a **77% asset size reduction** and completely bypassing floating-point string parsing on load.
 * **DSP Loop Unswitching**: Re-architected [RT_LSTM::process](Source/RTNeuralLSTM.cpp#L120) by splitting parameter-smoothing logic into specialized branch-free execution paths, optimizing CPU pipelines and instruction density.
 * **Resampler Latency Optimization**: Replaced low-level resamplers with custom tuned `r8b::CDSPResampler` profiles (12.0% transition band and 100 dB attenuation), dropping round-trip DSP latency from ~70.8 ms to **~9.2 ms (at 44.1 kHz)**.
@@ -98,6 +99,7 @@ This fork of **TS-M1N3** serves as an experimental branch exploring alternative 
 * **Diagnostic Memory Allocator**: Created a custom `MyJSONAllocator` template with `AllocationTracker` to report precise memory footprints during the model loading phase.
 
 ### 4. Graphical User Interface (GUI)
+* **Push Mod Switch**: Positioned a symmetrical 2-position toggle switch (`juce::Slider`) on the left face (`x = 52`, balancing the right-side input gain switch at `x = 185`) to engage/disengage the pre-overdrive low-mid boost filter, complete with custom look-and-feel graphics and handwritten `"on"`/`"off"` UI labels.
 * **Build Time Stamp**: Embedded a visual build timestamp formatted as `"RAMERED @ YY.M.[__TIME__]"` at the bottom-left corner of the pedal UI.
 * **Background Rendering**: Simplified paint clipping code to utilize standard JUCE cross-platform drawing functions.
 

@@ -45,10 +45,12 @@ The plugin emulates the physical pedal using the following controls:
 1.  **Drive (Overdrive Gain)**: Conditioned parameter of the neural network. Controls the level of distortion. Mapped in JUCE under the ID `"drive"`, ranging from `0.0` to `1.0` (default `0.5`).
 2.  **Tone (Tone Filter)**: Conditioned parameter of the neural network. Controls frequency response (brightness/treble cut). Mapped under the ID `"tone"`, ranging from `0.0` to `1.0` (default `0.5`).
 3.  **Level (Master Volume)**: Output gain adjustment applied post-emulation. Mapped under the ID `"level"`, ranging from `0.0` to `1.0` (default `0.5`).
-4.  **Bypass/Active (Footswitch)**: Physical toggle on the graphical interface (`odFootSw`) that switches the bypass state (`fw_state`).
+4.  **Input Gain / Mode Switch**: A 3-position vertical slider toggle ID `"input_gain"` on the right face (`185, 92, 18, 37`) selecting between **LO** (1.5x pre-gain), **MID** (3.0x pre-gain), and **HI** (4.5x pre-gain) amplification before the overdrive model.
+5.  **Push Mod Switch**: A 2-position toggle switch ID `"push"` on the left face (`52, 92, 18, 37`) placed symmetrically opposite to the input gain toggle. When enabled, it activates a 200 Hz peaking parametric EQ filter (+2.0 dB) pre-overdrive to shape the clipping density.
+6.  **Bypass/Active (Footswitch)**: Physical toggle on the graphical interface (`odFootSw`) that switches the bypass state (`fw_state`).
     *   `fw_state = 0`: Bypass (clean signal bypass).
     *   `fw_state = 1`: Active pedal (neural processing enabled).
-5.  **Status LED**: Red LED (`odLED`) turns on when the pedal is active.
+7.  **Status LED**: Red LED (`odLED`) turns on when the pedal is active.
 
 ---
 
@@ -76,8 +78,11 @@ Below is the detailed logical flow of each block's processing in [PluginProcesso
 graph TD
     A[Audio Input: processBlock] --> B{Bypass fw_state == 1?}
     B -- No --> C[Bypass: Clean signal passes through]
-    B -- Yes --> D[Apply Fixed Pre-Gain 3.0]
-    D --> E[ChowDSP Resampler: Convert native fs to 48 kHz]
+    B -- Yes --> D[Apply Pre-Gain: LO 1.5 / MID 3.0 / HI 4.5]
+    D --> DP{Push Mod active?}
+    DP -- Yes --> DP2[Apply Peaking EQ Filter: +2 dB at 200 Hz]
+    DP -- No --> E
+    DP2 --> E[ChowDSP Resampler: Convert native fs to 48 kHz]
     E --> F[Process Channel 0 Left with LSTM]
     E --> G[Process Channel 1 Right with LSTM2]
     F --> H[Sample-by-sample linear interpolation of Drive and Tone]
@@ -89,7 +94,8 @@ graph TD
 ```
 
 ### DSP Operational Details
-*   **Pre-Gain**: The input audio signal is multiplied by a fixed factor of `3.0` before entering the neural network.
+*   **Pre-Gain & Modes**: The input audio signal is multiplied by a user-selected gain factor of `1.5` (LO), `3.0` (MID, default), or `4.5` (HI) before entering the processing chain.
+*   **Push Mod EQ**: When active, a stereo parametric peaking filter (`juce::dsp::IIR::Filter<float>`) centered at `200 Hz` with a Q of `1.0` applies a `+2.0 dB` boost to pre-condition the low-mids before the distortion stage. When inactive, the filters run flat (0.0 dB / bypass).
 *   **Parameter Smoothing (Smoothing)**:
     *   To avoid sudden parameter transitions that cause audio clicks ("zipper noise"), the `RT_LSTM` class calculates a linear step delta per sample: `steppedValue = (targetParam - previousParam) / numSamples`.
     *   The `drive` and `tone` values are dynamically interpolated for each sample in the buffer.
@@ -145,3 +151,6 @@ The following issues have been resolved:
 6.  **Resampler Latency and DAW Synchronization Fix**:
     *   *Before*: The voxengo `CDSPResampler24` backend used a 2.0% transition band and 180 dB attenuation by default, introducing a ~70.8 ms roundtrip latency at sample rates other than 48 kHz. This was unplayable for real-time monitoring and, because it was never reported to the host via `setLatencySamples()`, caused out-of-sync playback in DAWs.
     *   *Fix*: Switched to `r8b::CDSPResampler` with optimized parameters (12.0% transition band and 100 dB attenuation), lowering latency to under 10 ms (specifically ~9.2 ms) which is completely playable and transparent for guitar signals. Implemented `getLatencySamples()` across the resampler classes and reported the combined latency to the DAW inside `prepareToPlay()` using `setLatencySamples()` for automatic DAW synchronization.
+7.  **Integrated Push Modification (Low-Mid Peaking EQ)**:
+    *   *Request*: Add a symmetrical 2-position push switch on the left side of the pedal GUI (+2 dB boost centered at 200 Hz) to enrich the guitar tone ("fatness") prior to the overdrive circuit.
+    *   *Implementation*: Added parameter `"push"` to the APVTS. Configured stereo `juce::dsp::IIR::Filter<float>` peaking EQ pre-resampling (operating on the input block pre-overdrive) with center frequency `200 Hz`, Q of `1.0`, and gain boost of `+2.0 dB` (0 dB when off). Symmetrically positioned the switch GUI on the left side of the panel, complete with custom text labels and look-and-feel assets.

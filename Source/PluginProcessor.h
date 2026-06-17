@@ -27,6 +27,8 @@
 #define TONE_NAME "Tone"
 #define INPUT_GAIN_ID "input_gain"
 #define INPUT_GAIN_NAME "Input Gain"
+#define PUSH_ID "push"
+#define PUSH_NAME "Push"
 
 
 //==============================================================================
@@ -102,12 +104,18 @@ private:
     std::atomic<float>* toneParam = nullptr;
     std::atomic<float>* masterParam = nullptr;
     std::atomic<float>* inputGainParam = nullptr;
+    std::atomic<float>* pushParam = nullptr;
 
     float previousMasterValue = 0.5;
+    float previousPushValue = -1.0f;
 
     chowdsp::ResampledProcess<R8BrainResampler> resampler;
 
-    //dsp::IIR::Filter<float> dcBlocker;  // Unused for TS-M1N3 plugin, leaving commented as template for future plugins
+    // Parametric EQ (Push Mod) centered at 200 Hz
+    dsp::IIR::Filter<float> pushFilterL;
+    dsp::IIR::Filter<float> pushFilterR;
+
+    void updatePushFilters (double sampleRate);
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TSM1N3AudioProcessor)

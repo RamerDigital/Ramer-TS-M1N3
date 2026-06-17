@@ -299,6 +299,7 @@ private:
   Slider ampMasterKnob;
   Slider ampToneKnob;
   Slider inputGainToggle;
+  Slider pushToggle;
 
   virtual void buttonClicked(Button *button) override;
 
@@ -319,6 +320,8 @@ public:
       masterSliderAttach;
   std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment>
       inputGainToggleAttach;
+  std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment>
+      pushToggleAttach;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TSM1N3AudioProcessorEditor)
 };

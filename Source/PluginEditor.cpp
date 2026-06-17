@@ -73,6 +73,13 @@ TSM1N3AudioProcessorEditor::TSM1N3AudioProcessorEditor (TSM1N3AudioProcessor& p)
     inputGainToggle.setTextBoxStyle(Slider::TextEntryBoxPosition::NoTextBox, false, 0, 0);
     inputGainToggleAttach = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, INPUT_GAIN_ID, inputGainToggle);
 
+    addAndMakeVisible(pushToggle);
+    pushToggle.setLookAndFeel(&toggleSwitchLAF);
+    pushToggle.setSliderStyle(Slider::SliderStyle::LinearVertical);
+    pushToggle.setRange(0, 1, 1);
+    pushToggle.setTextBoxStyle(Slider::TextEntryBoxPosition::NoTextBox, false, 0, 0);
+    pushToggleAttach = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, PUSH_ID, pushToggle);
+
     addAndMakeVisible (infoButton);
     infoButton.addListener (this);
     addChildComponent (infoOverlay);
@@ -88,6 +95,7 @@ TSM1N3AudioProcessorEditor::~TSM1N3AudioProcessorEditor()
     ampToneKnob.setLookAndFeel(nullptr);
     ampMasterKnob.setLookAndFeel(nullptr);
     inputGainToggle.setLookAndFeel(nullptr);
+    pushToggle.setLookAndFeel(nullptr);
 }
 
 //==============================================================================
@@ -111,6 +119,10 @@ void TSM1N3AudioProcessorEditor::paint (Graphics& g)
     g.drawText ("hi", 156, 95, 25, 10, Justification::right);
     g.drawText ("mid", 156, 105, 25, 10, Justification::right);
     g.drawText ("lo", 156, 115, 25, 10, Justification::right);
+
+    // Draw handwritten labels for push toggle switch
+    g.drawText ("on", 74, 95, 25, 10, Justification::left);
+    g.drawText ("off", 74, 115, 25, 10, Justification::left);
 }
 
 void TSM1N3AudioProcessorEditor::resized()
@@ -124,6 +136,7 @@ void TSM1N3AudioProcessorEditor::resized()
     ampToneKnob.setBounds(82, 68, 94, 71);
 
     inputGainToggle.setBounds(185, 92, 18, 37);
+    pushToggle.setBounds(52, 92, 18, 37);
 
     odLED.setBounds(114, 236, 30, 30);
     odFootSw.setBounds(100, 274, 60, 60);
