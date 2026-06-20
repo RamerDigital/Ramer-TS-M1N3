@@ -5,10 +5,10 @@
 > [!IMPORTANT]
 > **Zero Telemetry Guarantee**: This plugin contains absolutely zero telemetry, zero analytics, zero usage tracking, and zero network connectivity. It runs 100% offline and respects your privacy. Ramer Digital defends zero telemetry.
 
-> [!NOTE]
-> For developer guidelines, technical mapping, dependencies, functional parameters, and license compliance rules, refer to [ramer.md](ramer.md).
-
-![app](resources/app.jpg)
+<p align="center">
+  <img src="resources/app.jpg" alt="TS-M1N3 Front" width="35%" />
+  <img src="resources/app2.jpg" alt="TS-M1N3 Back" width="35%" />
+</p>
 
 **TS-M1N3** is a guitar plugin clone of the legendary TS-9 Tubescreamer analog overdrive pedal, fine-tuned exclusively for Apple Silicon. 
 
