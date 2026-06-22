@@ -34,8 +34,8 @@ project(ramer-ts-m1n3 VERSION ${PROJECT_VERSION_CLEAN})
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_subdirectory(modules)
-include_directories(modules)
+add_subdirectory(third-party)
+include_directories(third-party)
 
 set(JUCE_FORMATS AU VST3)
 

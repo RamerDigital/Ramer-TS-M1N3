@@ -1,12 +1,12 @@
-[submodule "modules/Ramer-chowdsp_utils"]
-	path = modules/Ramer-chowdsp_utils
+[submodule "third-party/Ramer-chowdsp_utils"]
+	path = third-party/Ramer-chowdsp_utils
 	url = https://github.com/RamerDigital/Ramer-chowdsp_utils.git
-[submodule "modules/Ramer-JUCE"]
-	path = modules/Ramer-JUCE
+[submodule "third-party/Ramer-JUCE"]
+	path = third-party/Ramer-JUCE
 	url = https://github.com/RamerDigital/Ramer-JUCE.git
-[submodule "modules/Ramer-RTNeural"]
-	path = modules/Ramer-RTNeural
+[submodule "third-party/Ramer-RTNeural"]
+	path = third-party/Ramer-RTNeural
 	url = https://github.com/RamerDigital/Ramer-RTNeural.git
-[submodule "modules/Ramer-r8brain-free-src"]
-	path = modules/Ramer-r8brain-free-src
+[submodule "third-party/Ramer-r8brain-free-src"]
+	path = third-party/Ramer-r8brain-free-src
 	url = https://github.com/RamerDigital/Ramer-r8brain-free-src.git

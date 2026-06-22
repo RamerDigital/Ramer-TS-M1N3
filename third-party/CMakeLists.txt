@@ -12,7 +12,7 @@ add_subdirectory(Ramer-RTNeural)
 
 include(cmake/WarningFlags.cmake)
 add_library(juce_plugin_modules STATIC)
-add_subdirectory(Ramer-RTNeural/modules/Ramer-nlohmann-json)
+add_subdirectory(Ramer-RTNeural/third-party/Ramer-nlohmann-json)
 add_subdirectory(Ramer-chowdsp_utils)
 
 target_link_libraries(juce_plugin_modules
@@ -47,7 +47,7 @@ target_compile_definitions(juce_plugin_modules
 target_include_directories(juce_plugin_modules
     PUBLIC
         Ramer-RTNeural
-        Ramer-RTNeural/modules/Ramer-xsimd/include
+        Ramer-RTNeural/third-party/Ramer-xsimd/include
         Ramer-r8brain-free-src
     INTERFACE
         $<TARGET_PROPERTY:juce_plugin_modules,INCLUDE_DIRECTORIES>
