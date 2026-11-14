@@ -7,13 +7,13 @@
 
   ==============================================================================
 */
+#pragma once
 
 #include <nlohmann/json.hpp>
 #include "RTNeuralLSTM.h"
-
-#pragma once
-
+#include <Accelerate/Accelerate.h>
 #include "../JuceLibraryCode/JuceHeader.h"
+#include <dsp/ResamplingContainer/ResamplingContainer.h>
 
 #define GAIN_ID "drive"
 #define GAIN_NAME "Drive"
@@ -21,15 +21,19 @@
 #define MASTER_NAME "Level"
 #define TONE_ID "tone"
 #define TONE_NAME "Tone"
+#define INPUT_GAIN_ID "input_gain"
+#define INPUT_GAIN_NAME "Input Gain"
+#define PUSH_ID "push"
+#define PUSH_NAME "Push"
 
 
 //==============================================================================
-class TSM1N3AudioProcessor  : public AudioProcessor
+class TSM1N3AudioProcessor  : public juce::AudioProcessor
 {
 public:
     //==============================================================================
     TSM1N3AudioProcessor();
-    ~TSM1N3AudioProcessor();
+    ~TSM1N3AudioProcessor() override;
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -39,14 +43,14 @@ public:
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
 
-    void processBlock (AudioBuffer<float>&, MidiBuffer&) override;
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     //==============================================================================
-    AudioProcessorEditor* createEditor() override;
+    juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
 
     //==============================================================================
-    const String getName() const override;
+    const juce::String getName() const override;
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;
@@ -57,50 +61,40 @@ public:
     int getNumPrograms() override;
     int getCurrentProgram() override;
     void setCurrentProgram (int index) override;
-    const String getProgramName (int index) override;
-    void changeProgramName (int index, const String& newName) override;
+    const juce::String getProgramName (int index) override;
+    void changeProgramName (int index, const juce::String& newName) override;
 
     //==============================================================================
-    void getStateInformation (MemoryBlock& destData) override;
+    void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
     
-    //float convertLogScale(float in_value, float x_min, float x_max, float y_min, float y_max);
-
-    //float decibelToLinear(float dbValue);
-
-    //void setDrive(float paramDrive);
-    //void setTone(float paramTone);
-    //void setMaster(float db_ampMaster);
-
     // Pedal/amp states
-    int fw_state = 1; // 0 = off, 1 = on
-    //float driveValue = 0.5;
-    //float toneValue = 0.5;
-    //float masterValue = 0.5;
-    //float previousMasterValue = 0.5;
+    std::atomic<int> fw_state { 1 }; // 0 = off, 1 = on
 
     bool lstm_state = true;
 
     RT_LSTM LSTM;
     RT_LSTM LSTM2;
 
-    AudioProcessorValueTreeState treeState;
+    juce::AudioProcessorValueTreeState treeState;
 
 private:
-
-    //float driveValue = 0.5;
-    //float toneValue = 0.5;
-    //float masterValue = 0.5;
-
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* toneParam = nullptr;
     std::atomic<float>* masterParam = nullptr;
+    std::atomic<float>* inputGainParam = nullptr;
+    std::atomic<float>* pushParam = nullptr;
 
-    float previousMasterValue = 0.5;
+    float previousMasterValue = 0.5f;
+    bool previousPushActive = false;
+    bool needsResampling = false;
 
-    chowdsp::ResampledProcess<chowdsp::ResamplingTypes::SRCResampler<>> resampler;
+    ::dsp::ResamplingContainer<float, 2> resampler { 48000.0 };
+    std::vector<float> monoRightScratch;
 
-    //dsp::IIR::Filter<float> dcBlocker;  // Unused for TS-M1N3 plugin, leaving commented as template for future plugins
+    // Parametric EQ (Push Mod) centered at 200 Hz (+2.0 dB)
+    juce::dsp::IIR::Filter<float> pushFilterL;
+    juce::dsp::IIR::Filter<float> pushFilterR;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TSM1N3AudioProcessor)

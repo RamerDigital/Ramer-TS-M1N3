@@ -1,0 +1,34 @@
+# Build directories
+.build*/
+/build/
+.bin/
+/bin/
+DerivedData/
+!**/extras/Build/**
+
+# Xcode & Apple project files
+*.xcodeproj/
+*.xcworkspace/
+*.xcuserdatad
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pbxuser
+
+# Plugin & App binary bundles
+*.component
+*.vst3
+*.app
+*.pkg
+*.dSYM/
+
+# OS & Editor artifacts
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+*.swp
+*.orig
+compile_commands.json
+.cache/

@@ -1,0 +1,80 @@
+cmake_minimum_required(VERSION 3.15)
+
+# ==============================================================================
+# TS-M1N3 CMake Configuration for macOS Desktop (AU, VST3 & Standalone)
+# ==============================================================================
+
+set(JUCE_FORMATS AU VST3 Standalone)
+
+juce_add_plugin(ramer-ts-m1n3
+    COMPANY_NAME "Ramer Digital"
+    BUNDLE_ID "com.ramerdigital.ramer-ts-m1n3"
+    VERSION "${PROJECT_VERSION_STRING}"
+    PLUGIN_MANUFACTURER_CODE RaDi
+    PLUGIN_CODE Rdm3
+    FORMATS ${JUCE_FORMATS}
+    PRODUCT_NAME "Ramer-TS-M1N3"
+    AU_MAIN_TYPE kAudioUnitType_Effect
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/AppIcon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/AppIcon-512.png"
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "This plugin requires audio input to process your instrument signal in real-time."
+)
+
+juce_generate_juce_header(ramer-ts-m1n3)
+
+target_sources(ramer-ts-m1n3 PRIVATE
+    Source/UI/Common/KnobLAF.cpp
+    Source/UI/Common/KnobLAF.h
+    Source/UI/Common/Footswitch.cpp
+    Source/UI/Common/Footswitch.h
+    Source/UI/Common/Led.cpp
+    Source/UI/Common/Led.h
+    Source/UI/Common/InfoButton.cpp
+    Source/UI/Common/InfoButton.h
+    Source/UI/Common/ToggleSwitchLAF.cpp
+    Source/UI/Common/ToggleSwitchLAF.h
+    Source/UI/Mac/PluginProcessor_UI_Mac.cpp
+    Source/UI/Mac/PluginProcessor_UI_Mac.h
+    Source/PluginProcessor.cpp
+    Source/PluginProcessor.h
+    Source/RTNeuralLSTM.cpp
+    Source/RTNeuralLSTM.h
+    Source/JSONAllocator.h
+)
+
+target_compile_definitions(ramer-ts-m1n3
+    PUBLIC
+    JUCE_REPORT_APP_USAGE=0
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    JUCE_MAC=1
+)
+
+target_link_libraries(ramer-ts-m1n3 PUBLIC
+    juce_plugin_modules
+    BinaryData
+)
+
+if(APPLE AND CMAKE_GENERATOR MATCHES "Xcode")
+    set(mac_plugin_targets ramer-ts-m1n3 ramer-ts-m1n3_AU ramer-ts-m1n3_VST3 ramer-ts-m1n3_Standalone)
+
+    foreach(target IN LISTS mac_plugin_targets)
+        if(TARGET ${target})
+            set_target_properties(${target} PROPERTIES
+                XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "public.app-category.music"
+            )
+            if(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY)
+                set_target_properties(${target} PROPERTIES
+                    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY}"
+                )
+            endif()
+            if(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE)
+                set_target_properties(${target} PROPERTIES
+                    XCODE_ATTRIBUTE_CODE_SIGN_STYLE "${CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE}"
+                )
+            endif()
+        endif()
+    endforeach()
+endif()

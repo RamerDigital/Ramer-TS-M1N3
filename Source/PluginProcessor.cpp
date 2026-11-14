@@ -9,9 +9,11 @@
 */
 
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
+#include "UI/Mac/PluginProcessor_UI_Mac.h"
 #include <iostream>
 #include <fstream>
+
+using namespace juce;
 
 //==============================================================================
 TSM1N3AudioProcessor::TSM1N3AudioProcessor()
@@ -24,15 +26,39 @@ TSM1N3AudioProcessor::TSM1N3AudioProcessor()
         .withOutput("Output", AudioChannelSet::stereo(), true)
 #endif
     ),    
-    treeState(*this, nullptr, "PARAMETER", { std::make_unique<AudioParameterFloat>(GAIN_ID, GAIN_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f),
+    treeState(*this, nullptr, "PARAMETER", { std::make_unique<AudioParameterFloat>(GAIN_ID, GAIN_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f),
                         std::make_unique<AudioParameterFloat>(TONE_ID, TONE_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f),
-                        std::make_unique<AudioParameterFloat>(MASTER_ID, MASTER_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5) })
+                        std::make_unique<AudioParameterFloat>(MASTER_ID, MASTER_NAME, NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5),
+                        std::make_unique<AudioParameterChoice>(INPUT_GAIN_ID, INPUT_GAIN_NAME, StringArray { "LO", "MID", "HI" }, 1),
+                        std::make_unique<AudioParameterBool>(PUSH_ID, PUSH_NAME, false) })
 
 #endif
 {
     driveParam = treeState.getRawParameterValue (GAIN_ID);
     masterParam = treeState.getRawParameterValue (MASTER_ID);
     toneParam = treeState.getRawParameterValue (TONE_ID);
+    inputGainParam = treeState.getRawParameterValue (INPUT_GAIN_ID);
+    pushParam = treeState.getRawParameterValue (PUSH_ID);
+
+    // Load 48 kHz sample rate model once at construction from MessagePack binary format
+    AllocationTracker::reset();
+
+    const auto* msgpackData = reinterpret_cast<const uint8_t*> (BinaryData::model_ts9_48k_cond2_msgpack);
+    TS_JSON weights_json = TS_JSON::from_msgpack (msgpackData, msgpackData + BinaryData::model_ts9_48k_cond2_msgpackSize);
+
+#if JUCE_DEBUG
+    size_t activeAllocs = AllocationTracker::activeAllocations.load();
+    size_t allocatedBytes = AllocationTracker::totalAllocatedBytes.load();
+    DBG ("[ramer-ts-m1n3] Neural model parsed: " << activeAllocs << " active allocations, " << allocatedBytes << " bytes allocated via MyJSONAllocator.");
+#endif
+
+    bool success1 = LSTM.load_json3 (weights_json);
+    bool success2 = LSTM2.load_json3 (weights_json);
+    if (!success1 || !success2)
+    {
+        DBG ("ERROR: Failed to load and validate LSTM models!");
+        jassertfalse;
+    }
 }
 
 
@@ -89,16 +115,16 @@ int TSM1N3AudioProcessor::getCurrentProgram()
     return 0;
 }
 
-void TSM1N3AudioProcessor::setCurrentProgram (int index)
+void TSM1N3AudioProcessor::setCurrentProgram (int /*index*/)
 {
 }
 
-const String TSM1N3AudioProcessor::getProgramName (int index)
+const String TSM1N3AudioProcessor::getProgramName (int /*index*/)
 {
     return {};
 }
 
-void TSM1N3AudioProcessor::changeProgramName (int index, const String& newName)
+void TSM1N3AudioProcessor::changeProgramName (int /*index*/, const String& /*newName*/)
 {
 }
 
@@ -110,21 +136,49 @@ void TSM1N3AudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     LSTM.reset();
     LSTM2.reset();
 
-    // prepare resampler for target sample rate: 48 kHz
-    constexpr double targetSampleRate = 48000.0;
-    resampler.prepareWithTargetSampleRate ({ sampleRate, (uint32) samplesPerBlock, 2 }, targetSampleRate);
+    // Sanitize sample rate to prevent division by zero or NaN ratios during DAW initialization
+    double safeSampleRate = sampleRate;
+    if (safeSampleRate <= 0.0)
+        safeSampleRate = 48000.0;
 
-    // load 48 kHz sample rate model
-    MemoryInputStream jsonInputStream(BinaryData::model_ts9_48k_cond2_json, BinaryData::model_ts9_48k_cond2_jsonSize, false);
-    nlohmann::json weights_json = nlohmann::json::parse(jsonInputStream.readEntireStreamAsString().toStdString());
+    // Enforce a minimum block size of 4096 to prevent buffer under-allocation
+    // and heap corruption if the DAW initializes with a tiny/zero block size.
+    int safeBlockSize = std::max (samplesPerBlock, 4096);
 
-    LSTM.load_json3(weights_json);
-    LSTM2.load_json3(weights_json);
+    monoRightScratch.assign ((size_t) safeBlockSize, 0.0f);
+    needsResampling = (std::abs (safeSampleRate - 48000.0) >= 1e-3);
 
-    // set up DC blocker
-    //dcBlocker.coefficients = dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, 35.0f);
-    //dsp::ProcessSpec spec{ sampleRate, static_cast<uint32> (samplesPerBlock), 2 };
-    //dcBlocker.prepare(spec);
+    if (needsResampling)
+    {
+        // Prepare resampler for target sample rate: 48 kHz
+        resampler.Reset (safeSampleRate, safeBlockSize);
+
+        // Report total resampler latency to the host DAW so it can align tracks
+        setLatencySamples (resampler.GetLatency());
+    }
+    else
+    {
+        // Host is already at native 48 kHz: bypass resampler with zero latency
+        setLatencySamples (0);
+    }
+
+    // Prepare Push Mod filters (+2.0 dB peak at 200 Hz, pre-allocated off the audio thread)
+    auto pushCoeffs = juce::dsp::IIR::Coefficients<float>::makePeakFilter (
+        safeSampleRate, 200.0f, 1.0f, Decibels::decibelsToGain (2.0f));
+    pushFilterL.coefficients = pushCoeffs;
+    pushFilterR.coefficients = pushCoeffs;
+
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = safeSampleRate;
+    spec.maximumBlockSize = (uint32) safeBlockSize;
+    spec.numChannels = 1;
+
+    pushFilterL.prepare (spec);
+    pushFilterR.prepare (spec);
+    pushFilterL.reset();
+    pushFilterR.reset();
+
+    previousPushActive = (pushParam != nullptr && pushParam->load() > 0.5f);
 }
 
 void TSM1N3AudioProcessor::releaseResources()
@@ -158,12 +212,11 @@ bool TSM1N3AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) c
 #endif
 
 
-void TSM1N3AudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
+void TSM1N3AudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer& /*midiMessages*/)
 {
     ScopedNoDenormals noDenormals;
 
     // Setup Audio Data
-    const int numSamples = buffer.getNumSamples();
 
     auto driveValue = static_cast<float> (driveParam->load());
     auto toneValue = static_cast<float> (toneParam->load());
@@ -171,28 +224,80 @@ void TSM1N3AudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&
 
     // Amp =============================================================================
     if (fw_state == 1) {
-		//Apply default gain
-        buffer.applyGain(3.0);
-		
-        // resample to target sample rate
-        dsp::AudioBlock<float> block(buffer);
-        //auto block = dsp::AudioBlock<float>(buffer.getArrayOfWritePointers(), 1, numSamples);
-        auto block48k = resampler.processIn(block);
-
-        // Apply LSTM model
-        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        // Apply selected pre-gain factor: LO (1.5), MID (3.0), HI (4.5)
+        float inputGainFactor = 3.0f;
+        if (inputGainParam != nullptr)
         {
-            // Apply LSTM model
-            if (ch == 0) {
-                LSTM.process(block48k.getChannelPointer(0), driveValue, toneValue, block48k.getChannelPointer(0), (int) block48k.getNumSamples());
+            auto inputGainSelection = static_cast<int> (inputGainParam->load());
+            if (inputGainSelection == 0)
+                inputGainFactor = 1.5f;
+            else if (inputGainSelection == 1)
+                inputGainFactor = 3.0f;
+            else if (inputGainSelection == 2)
+                inputGainFactor = 4.5f;
+        }
+        buffer.applyGain (inputGainFactor);
+		
+        // --- PUSH MOD EQ PROCESS (PRE-OVERDRIVE) ---
+        if (pushParam != nullptr)
+        {
+            const bool pushActive = (pushParam->load() > 0.5f);
+            if (pushActive != previousPushActive)
+            {
+                previousPushActive = pushActive;
+                pushFilterL.reset();
+                pushFilterR.reset();
             }
-            else if (ch == 1) {
-                LSTM2.process(block48k.getChannelPointer(1), driveValue, toneValue, block48k.getChannelPointer(1), (int) block48k.getNumSamples());
+
+            if (pushActive)
+            {
+                auto numSamples = buffer.getNumSamples();
+                auto* channelDataL = buffer.getWritePointer (0);
+                for (int i = 0; i < numSamples; ++i)
+                    channelDataL[i] = pushFilterL.processSample (channelDataL[i]);
+
+                if (buffer.getNumChannels() > 1)
+                {
+                    auto* channelDataR = buffer.getWritePointer (1);
+                    for (int i = 0; i < numSamples; ++i)
+                        channelDataR[i] = pushFilterR.processSample (channelDataR[i]);
+                }
             }
         }
 
-        // resample back to original sample rate
-        resampler.processOut(block48k, block);
+        // Prepare channel pointers for stereo/mono processing
+        const auto numSamples = buffer.getNumSamples();
+        const auto numChannels = buffer.getNumChannels();
+        auto* channelDataL = buffer.getWritePointer (0);
+
+        if (!needsResampling)
+        {
+            // Native 48 kHz processing (zero resampling latency & overhead)
+            LSTM.process (channelDataL, driveValue, toneValue, channelDataL, numSamples);
+            if (numChannels > 1)
+            {
+                auto* channelDataR = buffer.getWritePointer (1);
+                LSTM2.process (channelDataR, driveValue, toneValue, channelDataR, numSamples);
+            }
+        }
+        else
+        {
+            // Resample to 48 kHz, process with LSTM neural model, and resample back to host sample rate.
+            // Use dedicated scratch buffer for channel 1 when mono so PopBlock never overwrites channel 0.
+            if ((size_t) numSamples > monoRightScratch.size())
+                monoRightScratch.resize ((size_t) numSamples, 0.0f);
+
+            auto* channelDataR = (numChannels > 1) ? buffer.getWritePointer (1) : monoRightScratch.data();
+            float* channelPointers[2] = { channelDataL, channelDataR };
+
+            resampler.ProcessBlock (channelPointers, channelPointers, numSamples,
+                [&] (float** in, float** out, int nSamples)
+                {
+                    LSTM.process (in[0], driveValue, toneValue, out[0], nSamples);
+                    if (numChannels > 1)
+                        LSTM2.process (in[1], driveValue, toneValue, out[1], nSamples);
+                });
+        }
 
         // Master Volume 
         // Apply ramped changes for gain smoothing
@@ -215,7 +320,7 @@ bool TSM1N3AudioProcessor::hasEditor() const
 
 AudioProcessorEditor* TSM1N3AudioProcessor::createEditor()
 {
-    return new TSM1N3AudioProcessorEditor (*this);
+    return new PluginProcessor_UI_Mac (*this);
 }
 
 //==============================================================================
@@ -244,7 +349,7 @@ void TSM1N3AudioProcessor::setStateInformation (const void* data, int sizeInByte
         {
             treeState.replaceState (juce::ValueTree::fromXml (*xmlState));
             fw_state = xmlState->getBoolAttribute ("fw_state");
-            if (auto* editor = dynamic_cast<TSM1N3AudioProcessorEditor*> (getActiveEditor()))
+            if (auto* editor = dynamic_cast<PluginProcessor_UI_Mac*> (getActiveEditor()))
                 editor->resetImages();
         }
     }
@@ -257,3 +362,4 @@ AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new TSM1N3AudioProcessor();
 }
+

@@ -1,0 +1,1 @@
+target_compile_definitions(RTNeural PUBLIC RTNEURAL_DEFAULT_ALIGNMENT=16)
