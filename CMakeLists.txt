@@ -41,20 +41,7 @@ message(STATUS "VERSION for JUCE: ${juce_version}")
 
 set(RTNEURAL_XSIMD ON CACHE BOOL "Use RTNeural with this backend" FORCE)
 add_subdirectory(third-party/Ramer-RTNeural)
-
-file(GLOB_RECURSE AUDIO_DSP_TOOLS_SOURCES
-    "third-party/AudioDSPTools/dsp/*.cpp"
-    "third-party/AudioDSPTools/dsp/*.h"
-)
-add_library(audio_dsp_tools STATIC ${AUDIO_DSP_TOOLS_SOURCES})
-target_include_directories(audio_dsp_tools PUBLIC
-    "third-party/AudioDSPTools"
-    "third-party/AudioDSPTools/dsp"
-    "third-party/Ramer-RTNeural/third-party/Eigen"
-)
-target_compile_features(audio_dsp_tools PUBLIC cxx_std_20)
-target_compile_options(audio_dsp_tools PRIVATE -O3 -mcpu=apple-m1 -flto=thin -w)
-target_link_options(audio_dsp_tools PUBLIC -flto=thin)
+add_subdirectory(third-party/Ramer-AudioDSPTools)
 
 include(third-party/cmake/WarningFlags.cmake)
 add_subdirectory(third-party/Ramer-RTNeural/third-party/json)
@@ -85,10 +72,10 @@ target_link_libraries(juce_plugin_modules
         juce::juce_audio_utils
         juce::juce_audio_plugin_client
         juce::juce_dsp
-        nlohmann_json::nlohmann_json
-        RTNeural
-        audio_dsp_tools
     PUBLIC
+        nlohmann_json::nlohmann_json
+        RTNeural::RTNeural
+        AudioDSPTools::audio_dsp_tools
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         warning_flags
@@ -107,16 +94,9 @@ target_compile_definitions(juce_plugin_modules
         $<TARGET_PROPERTY:juce_plugin_modules,COMPILE_DEFINITIONS>
 )
 
-target_include_directories(juce_plugin_modules SYSTEM
+target_include_directories(juce_plugin_modules
     PUBLIC
-        third-party/Ramer-RTNeural
-        third-party/Ramer-RTNeural/third-party/xsimd/include
-        third-party/Ramer-RTNeural/third-party/Eigen
-        third-party/AudioDSPTools
-        third-party/AudioDSPTools/dsp
         Source
-    INTERFACE
-        $<TARGET_PROPERTY:juce_plugin_modules,INCLUDE_DIRECTORIES>
 )
 
 set_target_properties(juce_plugin_modules PROPERTIES

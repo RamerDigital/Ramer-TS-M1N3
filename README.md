@@ -1,6 +1,6 @@
 # TS-M1N3
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-brightgreen.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Downloads](https://img.shields.io/github/downloads/ramerdigital/Ramer-TS-M1N3/total)](https://somsubhra.github.io/github-release-stats/?username=ramerdigital&repository=Ramer-TS-M1N3&page=1&per_page=30)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-brightgreen.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 > [!IMPORTANT]
 > **Zero Telemetry Guarantee**: This plugin contains absolutely zero telemetry, zero analytics, zero usage tracking, and zero network connectivity. It runs 100% offline and respects your privacy. Ramer Digital defends zero telemetry.
@@ -14,8 +14,8 @@
 
 ### Ramer Digital's Fork Motivation
 This repository is an alternative version maintained by **Ramer Digital** (based on the original open-source project by GuitarML). Our motivation is to optimize and experiment with alternative approaches to real-time machine learning in audio DSP, focusing on:
-*   **Apple Silicon Native Optimization**: Fine-tuned exclusively for Apple Silicon (native `arm64`, macOS 11.0+) using vectorized instruction sets (vDSP) via Apple's Accelerate framework and NEON SIMD to achieve optimal CPU efficiency.
-*   **AudioDSPTools Lanczos Resampling**: Implemented real-time Lanczos anti-aliasing resampling container (`AudioDSPTools`) for seamless, low-latency rate conversion between the host DAW and the 48 kHz neural network.
+*   **Apple Silicon Native Optimization**: Fine-tuned exclusively for Apple Silicon (native `arm64`, macOS 12.0+) using native ARM64 NEON intrinsics (`<arm_neon.h>`) and `xsimd::fma` with `-mcpu=apple-m1` and ThinLTO (`-flto=thin`) to achieve optimal CPU efficiency.
+*   **AudioDSPTools Lanczos Resampling**: Integrated real-time Lanczos anti-aliasing resampling (`Ramer-AudioDSPTools`) for seamless, low-latency conversion between host DAW sample rates and the 48 kHz neural network.
 *   **Optimized Parameter Handling**: Exploring zero-latency parameter smoothing and binary neural network weights.
 *   **Platform Integration & Stability**: Modernizing code standards and resolving build locks.
 
@@ -46,9 +46,12 @@ For the most realistic emulation, place the TS-M1N3 plugin before your virtual a
 Clone the repository and run the build script to compile ad-hoc signed **AU**, **VST3**, and **Standalone** targets locally on your Mac:
 
 ```bash
-# Clone the repository
-git clone https://github.com/ramerdigital/Ramer-TS-M1N3.git
+# Clone the repository with all submodules
+git clone --recursive https://github.com/RamerDigital/Ramer-TS-M1N3.git
 cd Ramer-TS-M1N3
+
+# (If cloned without --recursive, initialize submodules:)
+# git submodule update --init --recursive
 
 # Configure and build Release (ad-hoc signed locally)
 ./_build.sh
@@ -75,8 +78,8 @@ This fork of **TS-M1N3** serves as an experimental branch exploring alternative 
 ### 1. Platform & Compilation Enhancements
 * **Apple Silicon Exclusivity**: Transitioned macOS architecture to native `arm64` (Apple Silicon) target only, targeting `macOS 12.0+`. All obsolete Windows, Linux, LV2, and AAX files, scripts, and code paths have been removed.
 * **ExFAT Xcode Build Database Fix**: Configured C++ build intermediate output target (`CMAKE_XCODE_ATTRIBUTE_OBJROOT`) to local `/tmp` directory inside compilation scripts, solving parallel XcodeSQLite compiler locking issues on ExFAT/external partitions.
-* **Modern C++20 standard**: Upgraded root project from C++17 to C++20, replacing static asserts with compile-time type-safe C++20 `concepts`.
-* **CMake Dependency Order Resolution**: Fixed parallel compilation race conditions by linking `BinaryData` directly to the `TS-M1N3` target.
+* **Modern C++20 Standard**: Upgraded root project and submodules (`Ramer-RTNeural`, `Ramer-AudioDSPTools`) from C++17 to C++20 (`cxx_std_20`), leveraging C++20 `concepts` and `std::span` across the DSP and inference pipeline.
+* **CMake Dependency Order & Submodule Architecture**: Fixed parallel compilation race conditions by linking `BinaryData` alongside modular `third-party/` submodules ([`Ramer-JUCE`](https://github.com/RamerDigital/Ramer-JUCE), [`Ramer-RTNeural`](https://github.com/RamerDigital/Ramer-RTNeural), [`Ramer-AudioDSPTools`](https://github.com/RamerDigital/Ramer-AudioDSPTools)) to `juce_plugin_modules` and `ramer-ts-m1n3`.
 
 ### 2. Real-Time Performance & DSP Optimizations
 *   **Pre-Overdrive EQ Peaking (Push Mod)**: Configured a stereo `juce::dsp::IIR::Filter<float>` parametric peaking EQ centered at `200 Hz` with `+2.0 dB` boost and a Q of `1.0` pre-overdrive, enriching the "fatness" of the guitar tone by shaping the clipping density.

@@ -1,0 +1,12 @@
+[submodule "third-party/Ramer-JUCE"]
+	path = third-party/Ramer-JUCE
+	url = https://github.com/RamerDigital/Ramer-JUCE.git
+	branch = main
+[submodule "third-party/Ramer-RTNeural"]
+	path = third-party/Ramer-RTNeural
+	url = https://github.com/RamerDigital/Ramer-RTNeural.git
+	branch = main
+[submodule "third-party/Ramer-AudioDSPTools"]
+	path = third-party/Ramer-AudioDSPTools
+	url = https://github.com/RamerDigital/Ramer-AudioDSPTools.git
+	branch = main
