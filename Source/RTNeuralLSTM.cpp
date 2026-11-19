@@ -1,3 +1,13 @@
+/*
+  ==============================================================================
+
+    RTNeuralLSTM.cpp
+    Original work Copyright (c) 2021-2023 Keith Bloemer (GuitarML)
+    Modified by Ramer Digital (2026) — MessagePack & Loop-Unswitched RTNeural
+    Licensed under the GNU General Public License v3.0 (GPLv3)
+
+  ==============================================================================
+*/
 #include "RTNeuralLSTM.h"
 #include <iostream>
 

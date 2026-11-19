@@ -13,7 +13,7 @@
 **TS-M1N3** is a guitar plugin clone of the legendary TS-9 Tubescreamer analog overdrive pedal, fine-tuned exclusively for Apple Silicon. 
 
 ### Ramer Digital's Fork Motivation
-This repository is an alternative version maintained by **Ramer Digital** (based on the original open-source project by GuitarML). Our motivation is to optimize and experiment with alternative approaches to real-time machine learning in audio DSP, focusing on:
+This repository is an alternative version maintained by **Ramer Digital** (based on the original open-source project [GuitarML/TS-M1N3](https://github.com/GuitarML/TS-M1N3) by Keith Bloemer). Our motivation is to optimize and experiment with alternative approaches to real-time machine learning in audio DSP, focusing on:
 *   **Apple Silicon Native Optimization**: Fine-tuned exclusively for Apple Silicon (native `arm64`, macOS 12.0+) using native ARM64 NEON intrinsics (`<arm_neon.h>`) and `xsimd::fma` with `-mcpu=apple-m1` and ThinLTO (`-flto=thin`) to achieve optimal CPU efficiency.
 *   **AudioDSPTools Lanczos Resampling**: Integrated real-time Lanczos anti-aliasing resampling (`Ramer-AudioDSPTools`) for seamless, low-latency conversion between host DAW sample rates and the 48 kHz neural network.
 *   **Optimized Parameter Handling**: Exploring zero-latency parameter smoothing and binary neural network weights.
@@ -101,4 +101,8 @@ This fork of **TS-M1N3** serves as an experimental branch exploring alternative 
 ---
 
 ### Special Thanks
-Special thanks to the UAH (University of Alabama in Huntsville) [MLAMSK](https://github.com/mlamsk) Senior Design Team, whose research and hard work directly impacted the development of this plugin.
+Special thanks to **Keith Bloemer ([GuitarML](https://github.com/GuitarML))** and the UAH (University of Alabama in Huntsville) [MLAMSK](https://github.com/mlamsk) Senior Design Team, whose research and hard work directly impacted the development of this plugin.
+
+### License & Trademark Notice
+* **License**: Distributed under the **GNU General Public License v3.0 (GPLv3)**. See [LICENSE.txt](LICENSE.txt) for full details. Original work Copyright © 2021–2023 Keith Bloemer (GuitarML); Apple Silicon macOS optimizations and modifications Copyright © 2026 Ramer Digital.
+* **Trademark Disclaimer**: All product names, logos, and brands mentioned in this repository (including *TS-9* and *Tube Screamer*) are the property of their respective trademark holders, which are in no way associated, affiliated, or endorsed by Ramer Digital or GuitarML. These names are used solely for descriptive purpose to identify the analog hardware circuit modeled.

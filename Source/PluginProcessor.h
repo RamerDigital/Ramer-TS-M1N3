@@ -1,9 +1,10 @@
 /*
   ==============================================================================
 
-    This file was auto-generated!
-
-    It contains the basic framework code for a JUCE plugin processor.
+    PluginProcessor.h
+    Original work Copyright (c) 2021-2023 Keith Bloemer (GuitarML)
+    Modified by Ramer Digital (2026) — Apple Silicon macOS DSP & Resampling
+    Licensed under the GNU General Public License v3.0 (GPLv3)
 
   ==============================================================================
 */
